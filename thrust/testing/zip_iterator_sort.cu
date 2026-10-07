@@ -1,0 +1,30 @@
+#include <thrust/iterator/zip_iterator.h>
+#include <thrust/sort.h>
+
+#include <unittest/unittest.h>
+
+template <typename T>
+struct TestZipIteratorStableSort
+{
+  void operator()(const size_t n)
+  {
+    thrust::host_vector<T> h1 = unittest::random_integers<T>(n);
+    thrust::host_vector<T> h2 = unittest::random_integers<T>(n);
+
+    thrust::device_vector<T> d1 = h1;
+    thrust::device_vector<T> d2 = h2;
+
+    // sort on host
+    thrust::stable_sort(thrust::make_zip_iterator(h1.begin(), h2.begin()),
+                        thrust::make_zip_iterator(h1.end(), h2.end()));
+
+    // sort on device
+    thrust::stable_sort(thrust::make_zip_iterator(d1.begin(), d2.begin()),
+                        thrust::make_zip_iterator(d1.end(), d2.end()));
+
+    REQUIRE(h1 == d1);
+    REQUIRE(h2 == d2);
+  }
+};
+DECLARE_GENERIC_SIZED_UNITTEST_WITH_TYPES(TestZipIteratorStableSort,
+                                          unittest::type_list<unittest::int8_t, unittest::int16_t, unittest::int32_t>);

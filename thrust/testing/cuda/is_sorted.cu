@@ -1,0 +1,89 @@
+#include <thrust/execution_policy.h>
+#include <thrust/sort.h>
+
+#include <unittest/unittest.h>
+
+#ifdef THRUST_TEST_DEVICE_SIDE
+template <typename ExecutionPolicy, typename Iterator, typename Iterator2>
+__global__ void is_sorted_kernel(ExecutionPolicy exec, Iterator first, Iterator last, Iterator2 result)
+{
+  *result = thrust::is_sorted(exec, first, last);
+}
+
+template <typename ExecutionPolicy>
+void TestIsSortedDevice(ExecutionPolicy exec)
+{
+  size_t n = 1000;
+
+  thrust::device_vector<int> v = unittest::random_integers<int>(n);
+
+  thrust::device_vector<bool> result(1);
+
+  v[0] = 1;
+  v[1] = 0;
+
+  is_sorted_kernel<<<1, 1>>>(exec, v.begin(), v.end(), result.begin());
+
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+
+  thrust::sort(v.begin(), v.end());
+
+  is_sorted_kernel<<<1, 1>>>(exec, v.begin(), v.end(), result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+}
+
+TEST_CASE("TestIsSortedDeviceSeq", "[is_sorted]")
+{
+  TestIsSortedDevice(thrust::seq);
+}
+
+TEST_CASE("TestIsSortedDeviceDevice", "[is_sorted]")
+{
+  TestIsSortedDevice(thrust::device);
+}
+#endif
+
+TEST_CASE("TestIsSortedCudaStreams", "[is_sorted]")
+{
+  thrust::device_vector<int> v(4);
+  v[0] = 0;
+  v[1] = 5;
+  v[2] = 8;
+  v[3] = 0;
+
+  cudaStream_t s;
+  cudaStreamCreate(&s);
+
+  REQUIRE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.begin() + 0));
+  REQUIRE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.begin() + 1));
+
+  // the following line crashes gcc 4.3
+#if (__GNUC__ == 4) && (__GNUC_MINOR__ == 3)
+  // do nothing
+#else
+  // compile this line on other compilers
+  REQUIRE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.begin() + 2));
+#endif // GCC
+
+  REQUIRE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.begin() + 3));
+  REQUIRE_FALSE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.begin() + 4));
+
+  REQUIRE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.begin() + 3, ::cuda::std::less<int>()));
+
+  REQUIRE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.begin() + 1, ::cuda::std::greater<int>()));
+  REQUIRE_FALSE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.begin() + 4, ::cuda::std::greater<int>()));
+
+  REQUIRE_FALSE(thrust::is_sorted(thrust::cuda::par.on(s), v.begin(), v.end()));
+
+  cudaStreamDestroy(s);
+}

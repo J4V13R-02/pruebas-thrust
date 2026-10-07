@@ -1,0 +1,307 @@
+#include <thrust/execution_policy.h>
+#include <thrust/functional.h>
+#include <thrust/logical.h>
+
+#include <unittest/unittest.h>
+
+#ifdef THRUST_TEST_DEVICE_SIDE
+template <typename ExecutionPolicy, typename Iterator, typename Function, typename Iterator2>
+__global__ void all_of_kernel(ExecutionPolicy exec, Iterator first, Iterator last, Function f, Iterator2 result)
+{
+  *result = thrust::all_of(exec, first, last, f);
+}
+
+template <typename ExecutionPolicy>
+void TestAllOfDevice(ExecutionPolicy exec)
+{
+  using T = int;
+  thrust::device_vector<T> v(3, 1);
+  thrust::device_vector<bool> result(1);
+
+  all_of_kernel<<<1, 1>>>(exec, v.begin(), v.end(), ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+
+  v[1] = 0;
+
+  all_of_kernel<<<1, 1>>>(exec, v.begin(), v.end(), ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+
+  all_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 0, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+
+  all_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 1, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+
+  all_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 2, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+
+  all_of_kernel<<<1, 1>>>(exec, v.begin() + 1, v.begin() + 2, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+}
+
+TEST_CASE("TestAllOfDeviceSeq", "[logical]")
+{
+  TestAllOfDevice(thrust::seq);
+}
+
+TEST_CASE("TestAllOfDeviceDevice", "[logical]")
+{
+  TestAllOfDevice(thrust::device);
+}
+#endif
+
+TEST_CASE("TestAllOfCudaStreams", "[logical]")
+{
+  using Vector = thrust::device_vector<int>;
+  using T      = Vector::value_type;
+
+  Vector v(3, T{1});
+
+  cudaStream_t s;
+  cudaStreamCreate(&s);
+
+  REQUIRE(thrust::all_of(thrust::cuda::par.on(s), v.begin(), v.end(), ::cuda::std::identity{}));
+
+  v[1] = 0;
+
+  REQUIRE_FALSE(thrust::all_of(thrust::cuda::par.on(s), v.begin(), v.end(), ::cuda::std::identity{}));
+
+  REQUIRE(thrust::all_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 0, ::cuda::std::identity{}));
+  REQUIRE(thrust::all_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 1, ::cuda::std::identity{}));
+  REQUIRE_FALSE(thrust::all_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 2, ::cuda::std::identity{}));
+  REQUIRE_FALSE(thrust::all_of(thrust::cuda::par.on(s), v.begin() + 1, v.begin() + 2, ::cuda::std::identity{}));
+
+  cudaStreamDestroy(s);
+}
+
+#ifdef THRUST_TEST_DEVICE_SIDE
+template <typename ExecutionPolicy, typename Iterator, typename Function, typename Iterator2>
+__global__ void any_of_kernel(ExecutionPolicy exec, Iterator first, Iterator last, Function f, Iterator2 result)
+{
+  *result = thrust::any_of(exec, first, last, f);
+}
+
+template <typename ExecutionPolicy>
+void TestAnyOfDevice(ExecutionPolicy exec)
+{
+  using T = int;
+
+  thrust::device_vector<T> v(3, 1);
+  thrust::device_vector<bool> result(1);
+
+  any_of_kernel<<<1, 1>>>(exec, v.begin(), v.end(), ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+
+  v[1] = 0;
+
+  any_of_kernel<<<1, 1>>>(exec, v.begin(), v.end(), ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+
+  any_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 0, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+
+  any_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 1, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+
+  any_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 2, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+
+  any_of_kernel<<<1, 1>>>(exec, v.begin() + 1, v.begin() + 2, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+}
+
+TEST_CASE("TestAnyOfDeviceSeq", "[logical]")
+{
+  TestAnyOfDevice(thrust::seq);
+}
+
+TEST_CASE("TestAnyOfDeviceDevice", "[logical]")
+{
+  TestAnyOfDevice(thrust::device);
+}
+#endif
+
+TEST_CASE("TestAnyOfCudaStreams", "[logical]")
+{
+  using Vector = thrust::device_vector<int>;
+  using T      = Vector::value_type;
+
+  Vector v(3, T{1});
+
+  cudaStream_t s;
+  cudaStreamCreate(&s);
+
+  REQUIRE(thrust::any_of(thrust::cuda::par.on(s), v.begin(), v.end(), ::cuda::std::identity{}));
+
+  v[1] = 0;
+
+  REQUIRE(thrust::any_of(thrust::cuda::par.on(s), v.begin(), v.end(), ::cuda::std::identity{}));
+
+  REQUIRE_FALSE(thrust::any_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 0, ::cuda::std::identity{}));
+  REQUIRE(thrust::any_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 1, ::cuda::std::identity{}));
+  REQUIRE(thrust::any_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 2, ::cuda::std::identity{}));
+  REQUIRE_FALSE(thrust::any_of(thrust::cuda::par.on(s), v.begin() + 1, v.begin() + 2, ::cuda::std::identity{}));
+
+  cudaStreamDestroy(s);
+}
+
+#ifdef THRUST_TEST_DEVICE_SIDE
+template <typename ExecutionPolicy, typename Iterator, typename Function, typename Iterator2>
+__global__ void none_of_kernel(ExecutionPolicy exec, Iterator first, Iterator last, Function f, Iterator2 result)
+{
+  *result = thrust::none_of(exec, first, last, f);
+}
+
+template <typename ExecutionPolicy>
+void TestNoneOfDevice(ExecutionPolicy exec)
+{
+  using T = int;
+
+  thrust::device_vector<T> v(3, 1);
+  thrust::device_vector<bool> result(1);
+
+  none_of_kernel<<<1, 1>>>(exec, v.begin(), v.end(), ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+
+  v[1] = 0;
+
+  none_of_kernel<<<1, 1>>>(exec, v.begin(), v.end(), ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+
+  none_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 0, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+
+  none_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 1, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+
+  none_of_kernel<<<1, 1>>>(exec, v.begin() + 0, v.begin() + 2, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE_FALSE(result[0]);
+
+  none_of_kernel<<<1, 1>>>(exec, v.begin() + 1, v.begin() + 2, ::cuda::std::identity{}, result.begin());
+  {
+    cudaError_t const err = cudaDeviceSynchronize();
+    REQUIRE(cudaSuccess == err);
+  }
+
+  REQUIRE(result[0]);
+}
+
+TEST_CASE("TestNoneOfDeviceSeq", "[logical]")
+{
+  TestNoneOfDevice(thrust::seq);
+}
+
+TEST_CASE("TestNoneOfDeviceDevice", "[logical]")
+{
+  TestNoneOfDevice(thrust::device);
+}
+#endif
+
+TEST_CASE("TestNoneOfCudaStreams", "[logical]")
+{
+  using Vector = thrust::device_vector<int>;
+  using T      = Vector::value_type;
+
+  Vector v(3, T{1});
+
+  cudaStream_t s;
+  cudaStreamCreate(&s);
+
+  REQUIRE_FALSE(thrust::none_of(thrust::cuda::par.on(s), v.begin(), v.end(), ::cuda::std::identity{}));
+
+  v[1] = 0;
+
+  REQUIRE_FALSE(thrust::none_of(thrust::cuda::par.on(s), v.begin(), v.end(), ::cuda::std::identity{}));
+
+  REQUIRE(thrust::none_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 0, ::cuda::std::identity{}));
+  REQUIRE_FALSE(thrust::none_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 1, ::cuda::std::identity{}));
+  REQUIRE_FALSE(thrust::none_of(thrust::cuda::par.on(s), v.begin() + 0, v.begin() + 2, ::cuda::std::identity{}));
+  REQUIRE(thrust::none_of(thrust::cuda::par.on(s), v.begin() + 1, v.begin() + 2, ::cuda::std::identity{}));
+
+  cudaStreamDestroy(s);
+}

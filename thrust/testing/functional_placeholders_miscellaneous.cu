@@ -1,0 +1,121 @@
+#include <thrust/functional.h>
+#include <thrust/transform.h>
+
+#include <unittest/unittest.h>
+
+template <typename T>
+struct saxpy_reference
+{
+  _CCCL_HOST_DEVICE saxpy_reference(const T& aa)
+      : a(aa)
+  {}
+
+  _CCCL_HOST_DEVICE T operator()(const T& x, const T& y) const
+  {
+    return a * x + y;
+  }
+
+  T a;
+};
+
+template <typename Vector>
+struct TestFunctionalPlaceholdersValue
+{
+  void operator()(const size_t)
+  {
+    const size_t n = 10000;
+    using T        = typename Vector::value_type;
+
+    const T a(13);
+
+    Vector x = unittest::random_integers<T>(n);
+    Vector y = unittest::random_integers<T>(n);
+    Vector result(n), reference(n);
+
+    thrust::transform(x.begin(), x.end(), y.begin(), reference.begin(), saxpy_reference<T>(a));
+
+    using namespace thrust::placeholders;
+    thrust::transform(x.begin(), x.end(), y.begin(), result.begin(), a * _1 + _2);
+
+    ASSERT_ALMOST_EQUAL(reference, result);
+  }
+};
+DECLARE_VECTOR_UNITTEST_WITH_TYPES_AND_NAME(
+  TestFunctionalPlaceholdersValue,
+  ThirtyTwoBitTypes,
+  thrust::device_vector,
+  thrust::device_allocator,
+  TestFunctionalPlaceholdersValueDevice);
+DECLARE_VECTOR_UNITTEST_WITH_TYPES_AND_NAME(
+  TestFunctionalPlaceholdersValue,
+  ThirtyTwoBitTypes,
+  thrust::host_vector,
+  std::allocator,
+  TestFunctionalPlaceholdersValueHost);
+
+template <typename Vector>
+struct TestFunctionalPlaceholdersTransformIterator
+{
+  void operator()(const size_t)
+  {
+    const size_t n = 10000;
+    using T        = typename Vector::value_type;
+
+    const T a(13);
+
+    Vector x = unittest::random_integers<T>(n);
+    Vector y = unittest::random_integers<T>(n);
+    Vector result(n), reference(n);
+
+    thrust::transform(x.begin(), x.end(), y.begin(), reference.begin(), saxpy_reference<T>(a));
+
+    using namespace thrust::placeholders;
+    thrust::transform(
+      thrust::make_transform_iterator(x.begin(), a * _1),
+      thrust::make_transform_iterator(x.end(), a * _1),
+      y.begin(),
+      result.begin(),
+      _1 + _2);
+
+    ASSERT_ALMOST_EQUAL(reference, result);
+  }
+};
+DECLARE_VECTOR_UNITTEST_WITH_TYPES_AND_NAME(
+  TestFunctionalPlaceholdersTransformIterator,
+  ThirtyTwoBitTypes,
+  thrust::device_vector,
+  thrust::device_allocator,
+  TestFunctionalPlaceholdersTransformIteratorDevice);
+DECLARE_VECTOR_UNITTEST_WITH_TYPES_AND_NAME(
+  TestFunctionalPlaceholdersTransformIterator,
+  ThirtyTwoBitTypes,
+  thrust::host_vector,
+  std::allocator,
+  TestFunctionalPlaceholdersTransformIteratorHost);
+
+TEST_CASE("TestFunctionalPlaceholdersArgumentValueCategories", "[functional_placeholders_miscellaneous]")
+{
+  using namespace thrust::placeholders;
+  auto expr = _1 * _1 + _2 * _2;
+  int a     = 2;
+  int b     = 3;
+  REQUIRE(expr(2, 3) == 13); // pass pr-value
+  REQUIRE(expr(a, b) == 13); // pass l-value
+  REQUIRE(expr(::cuda::std::move(a), ::cuda::std::move(b)) == 13); // pass x-value
+}
+
+TEST_CASE("TestFunctionalPlaceholdersSemiRegular", "[functional_placeholders_miscellaneous]")
+{
+  using namespace thrust::placeholders;
+  using Expr = decltype(_1 * _1 + _2 * _2);
+  // NOLINTNEXTLINE(misc-const-correctness)
+  Expr expr; // default-constructible
+  REQUIRE(expr(2, 3) == 13);
+  const Expr expr2 = expr; // copy-constructible
+  REQUIRE(expr2(2, 3) == 13);
+  Expr expr3;
+  expr3 = expr; // copy-assignable
+  REQUIRE(expr3(2, 3) == 13);
+
+  static_assert(::cuda::std::semiregular<Expr>);
+}

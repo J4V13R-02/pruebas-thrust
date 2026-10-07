@@ -1,0 +1,288 @@
+#include <thrust/find.h>
+#include <thrust/functional.h>
+#include <thrust/iterator/retag.h>
+#include <thrust/sequence.h>
+
+#include <cuda/std/cstdint>
+
+#include <unittest/unittest.h>
+
+template <class Vector>
+void TestFindSimple()
+{
+  Vector vec{1, 2, 3, 3, 5};
+
+  REQUIRE(thrust::find(vec.begin(), vec.end(), 0) - vec.begin() == 5);
+  REQUIRE(thrust::find(vec.begin(), vec.end(), 1) - vec.begin() == 0);
+  REQUIRE(thrust::find(vec.begin(), vec.end(), 2) - vec.begin() == 1);
+  REQUIRE(thrust::find(vec.begin(), vec.end(), 3) - vec.begin() == 2);
+  REQUIRE(thrust::find(vec.begin(), vec.end(), 4) - vec.begin() == 5);
+  REQUIRE(thrust::find(vec.begin(), vec.end(), 5) - vec.begin() == 4);
+}
+DECLARE_VECTOR_UNITTEST(TestFindSimple);
+
+template <typename InputIterator, typename T>
+InputIterator find(my_system& system, InputIterator first, InputIterator, const T&)
+{
+  system.validate_dispatch();
+  return first;
+}
+
+TEST_CASE("TestFindDispatchExplicit", "[find]")
+{
+  thrust::device_vector<int> vec(1);
+
+  my_system sys(0); // NOLINT(misc-const-correctness)
+  thrust::find(sys, vec.begin(), vec.end(), 0);
+
+  REQUIRE(sys.is_valid());
+}
+
+template <typename InputIterator, typename T>
+InputIterator find(my_tag, InputIterator first, InputIterator, const T&)
+{
+  *first = 13;
+  return first;
+}
+
+TEST_CASE("TestFindDispatchImplicit", "[find]")
+{
+  thrust::device_vector<int> vec(1);
+
+  thrust::find(thrust::retag<my_tag>(vec.begin()), thrust::retag<my_tag>(vec.end()), 0);
+
+  REQUIRE(13 == vec.front());
+}
+
+template <class Vector>
+void TestFindIfSimple()
+{
+  using T = typename Vector::value_type;
+
+  Vector vec{1, 2, 3, 3, 5};
+
+  using thrust::placeholders::_1;
+  REQUIRE(thrust::find_if(vec.begin(), vec.end(), _1 == T{0}) - vec.begin() == 5);
+  REQUIRE(thrust::find_if(vec.begin(), vec.end(), _1 == T{1}) - vec.begin() == 0);
+  REQUIRE(thrust::find_if(vec.begin(), vec.end(), _1 == T{2}) - vec.begin() == 1);
+  REQUIRE(thrust::find_if(vec.begin(), vec.end(), _1 == T{3}) - vec.begin() == 2);
+  REQUIRE(thrust::find_if(vec.begin(), vec.end(), _1 == T{4}) - vec.begin() == 5);
+  REQUIRE(thrust::find_if(vec.begin(), vec.end(), _1 == T{5}) - vec.begin() == 4);
+}
+DECLARE_VECTOR_UNITTEST(TestFindIfSimple);
+
+template <typename InputIterator, typename Predicate>
+InputIterator find_if(my_system& system, InputIterator first, InputIterator, Predicate)
+{
+  system.validate_dispatch();
+  return first;
+}
+
+TEST_CASE("TestFindIfDispatchExplicit", "[find]")
+{
+  thrust::device_vector<int> vec(1);
+
+  my_system sys(0); // NOLINT(misc-const-correctness)
+  thrust::find_if(sys, vec.begin(), vec.end(), ::cuda::std::identity{});
+
+  REQUIRE(sys.is_valid());
+}
+
+template <typename InputIterator, typename Predicate>
+InputIterator find_if(my_tag, InputIterator first, InputIterator, Predicate)
+{
+  *first = 13;
+  return first;
+}
+
+TEST_CASE("TestFindIfDispatchImplicit", "[find]")
+{
+  thrust::device_vector<int> vec(1);
+
+  thrust::find_if(thrust::retag<my_tag>(vec.begin()), thrust::retag<my_tag>(vec.end()), ::cuda::std::identity{});
+
+  REQUIRE(13 == vec.front());
+}
+
+template <class Vector>
+void TestFindIfNotSimple()
+{
+  using T = typename Vector::value_type;
+
+  Vector vec{0, 1, 2, 3, 4};
+
+  using thrust::placeholders::_1;
+  REQUIRE(0 == thrust::find_if_not(vec.begin(), vec.end(), _1 < T{0}) - vec.begin());
+  REQUIRE(1 == thrust::find_if_not(vec.begin(), vec.end(), _1 < T{1}) - vec.begin());
+  REQUIRE(2 == thrust::find_if_not(vec.begin(), vec.end(), _1 < T{2}) - vec.begin());
+  REQUIRE(3 == thrust::find_if_not(vec.begin(), vec.end(), _1 < T{3}) - vec.begin());
+  REQUIRE(4 == thrust::find_if_not(vec.begin(), vec.end(), _1 < T{4}) - vec.begin());
+  REQUIRE(5 == thrust::find_if_not(vec.begin(), vec.end(), _1 < T{5}) - vec.begin());
+}
+DECLARE_VECTOR_UNITTEST(TestFindIfNotSimple);
+
+template <typename InputIterator, typename Predicate>
+InputIterator find_if_not(my_system& system, InputIterator first, InputIterator, Predicate)
+{
+  system.validate_dispatch();
+  return first;
+}
+
+TEST_CASE("TestFindIfNotDispatchExplicit", "[find]")
+{
+  thrust::device_vector<int> vec(1);
+
+  my_system sys(0); // NOLINT(misc-const-correctness)
+  thrust::find_if_not(sys, vec.begin(), vec.end(), ::cuda::std::identity{});
+
+  REQUIRE(sys.is_valid());
+}
+
+template <typename InputIterator, typename Predicate>
+InputIterator find_if_not(my_tag, InputIterator first, InputIterator, Predicate)
+{
+  *first = 13;
+  return first;
+}
+
+TEST_CASE("TestFindIfNotDispatchImplicit", "[find]")
+{
+  thrust::device_vector<int> vec(1);
+
+  thrust::find_if_not(thrust::retag<my_tag>(vec.begin()), thrust::retag<my_tag>(vec.end()), ::cuda::std::identity{});
+
+  REQUIRE(13 == vec.front());
+}
+
+template <typename T>
+struct TestFind
+{
+  void operator()(const size_t n)
+  {
+    thrust::host_vector<T> h_data   = unittest::random_integers<T>(n);
+    thrust::device_vector<T> d_data = h_data;
+
+    typename thrust::host_vector<T>::iterator h_iter;
+    typename thrust::device_vector<T>::iterator d_iter;
+
+    h_iter = thrust::find(h_data.begin(), h_data.end(), T(0));
+    d_iter = thrust::find(d_data.begin(), d_data.end(), T(0));
+    REQUIRE(h_iter - h_data.begin() == d_iter - d_data.begin());
+
+    for (size_t i = 1; i < n; i *= 2)
+    {
+      T sample = h_data[i];
+      h_iter   = thrust::find(h_data.begin(), h_data.end(), sample);
+      d_iter   = thrust::find(d_data.begin(), d_data.end(), sample);
+      REQUIRE(h_iter - h_data.begin() == d_iter - d_data.begin());
+    }
+  }
+};
+DECLARE_GENERIC_SIZED_UNITTEST_WITH_TYPES(TestFind, SignedIntegralTypes);
+
+template <typename T>
+struct TestFindIf
+{
+  void operator()(const size_t n)
+  {
+    thrust::host_vector<T> h_data   = unittest::random_integers<T>(n);
+    thrust::device_vector<T> d_data = h_data;
+
+    typename thrust::host_vector<T>::iterator h_iter;
+    typename thrust::device_vector<T>::iterator d_iter;
+
+    using thrust::placeholders::_1;
+    h_iter = thrust::find_if(h_data.begin(), h_data.end(), _1 == T{0});
+    d_iter = thrust::find_if(d_data.begin(), d_data.end(), _1 == T{0});
+    REQUIRE(h_iter - h_data.begin() == d_iter - d_data.begin());
+
+    for (size_t i = 1; i < n; i *= 2)
+    {
+      T sample = h_data[i];
+      h_iter   = thrust::find_if(h_data.begin(), h_data.end(), _1 == T{sample});
+      d_iter   = thrust::find_if(d_data.begin(), d_data.end(), _1 == T{sample});
+      REQUIRE(h_iter - h_data.begin() == d_iter - d_data.begin());
+    }
+  }
+};
+DECLARE_GENERIC_SIZED_UNITTEST_WITH_TYPES(TestFindIf, SignedIntegralTypes);
+
+template <typename T>
+struct TestFindIfNot
+{
+  void operator()(const size_t n)
+  {
+    thrust::host_vector<T> h_data   = unittest::random_integers<T>(n);
+    thrust::device_vector<T> d_data = h_data;
+
+    typename thrust::host_vector<T>::iterator h_iter;
+    typename thrust::device_vector<T>::iterator d_iter;
+
+    using thrust::placeholders::_1;
+    h_iter = thrust::find_if_not(h_data.begin(), h_data.end(), _1 != T{0});
+    d_iter = thrust::find_if_not(d_data.begin(), d_data.end(), _1 != T{0});
+    REQUIRE(h_iter - h_data.begin() == d_iter - d_data.begin());
+
+    for (size_t i = 1; i < n; i *= 2)
+    {
+      T sample = h_data[i];
+      h_iter   = thrust::find_if_not(h_data.begin(), h_data.end(), _1 != T{sample});
+      d_iter   = thrust::find_if_not(d_data.begin(), d_data.end(), _1 != T{sample});
+      REQUIRE(h_iter - h_data.begin() == d_iter - d_data.begin());
+    }
+  }
+};
+DECLARE_GENERIC_SIZED_UNITTEST_WITH_TYPES(TestFindIfNot, SignedIntegralTypes);
+
+void TestFindWithBigIndexesHelper(int magnitude)
+{
+  const thrust::counting_iterator<long long> begin(1);
+  const thrust::counting_iterator<long long> end = begin + (1ll << magnitude);
+  REQUIRE(::cuda::std::distance(begin, end) == (1ll << magnitude));
+
+  cuda::std::intmax_t distance_low_value = ::cuda::std::distance(begin, thrust::find(thrust::device, begin, end, 17));
+
+  cuda::std::intmax_t distance_high_value =
+    ::cuda::std::distance(begin, thrust::find(thrust::device, begin, end, (1ll << magnitude) - 17));
+
+  REQUIRE(distance_low_value == 16);
+  REQUIRE(distance_high_value == (1ll << magnitude) - 18);
+}
+
+#ifndef THRUST_FORCE_32_BIT_OFFSET_TYPE
+TEST_CASE("TestFindWithBigIndexes", "[find]")
+{
+  TestFindWithBigIndexesHelper(30);
+  TestFindWithBigIndexesHelper(31);
+  TestFindWithBigIndexesHelper(32);
+  TestFindWithBigIndexesHelper(33);
+}
+#endif // THRUST_FORCE_32_BIT_OFFSET_TYPE
+
+namespace
+{
+class Weird
+{
+  int value;
+
+public:
+  _CCCL_HOST_DEVICE Weird(int val, int)
+      : value(val)
+  {}
+
+  friend _CCCL_HOST_DEVICE bool operator==(int x, Weird y)
+  {
+    return x == y.value;
+  }
+};
+} // namespace
+
+TEST_CASE("TestFindAsymmetricEquality", "[find]")
+{ // Regression test for NVIDIA/thrust#1229
+  thrust::host_vector<int> v(1000);
+  thrust::sequence(v.begin(), v.end());
+  thrust::device_vector<int> dv(v);
+  auto result = thrust::find(dv.begin(), dv.end(), Weird(333, 0));
+  REQUIRE(*result == 333);
+  REQUIRE(result - dv.begin() == 333);
+}
