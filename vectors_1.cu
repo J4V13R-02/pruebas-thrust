@@ -1,36 +1,28 @@
-#include "thrust/device_vector.h"
-#include "thrust/host_vector.h"
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+
+#include <thrust/copy.h>
+#include <thrust/fill.h>
+#include <thrust/sequence.h>
 
 #include <iostream>
 
 int main(void) {
-	thrust::host_vector<int> H(4);
 	
-	H[0] = 14;
-	H[1] = 20;
-	H[2] = 38;
-	H[3] = 46;
+	//Vector of size 10 set to 1 in all positions 
+	thrust::device_vector<int> D(10, 1);
 	
-	std::cout << "H has a size of: " << H.size() << std::endl;
+	//First 7 elements set to 9
+	thrust::fill(D.begin(), D.begin() + 7, 9);
 	
-	for (int i = 0; i < H.size(); i++) {
-		std::cout << "H [" << i << "] = " << H[i] << std::endl;
-	}
+	//Host vector initialized to the first 5 elements of D
+	thrust::host_vector<int> H(D.begin(), D.begin + 5);
 	
-	H.resize(2);
+	//Elements of H set in sequence from 0
+	thrust::sequence(H.begin(), H.end());
 	
-	std::cout << "Now H has a size of: " << H.size() << std::endl;
-	
-	thrust::device_vector<int> D = H;
-	
-	D[0] = 99;
-	D[1] = 88;
-	
-	for (int i = 0; i < D.size(); i++) {
-		std::cout << "D [" << i << "] = " << D[i] << std::endl;
-	}
-	
-	
-	
+	//Copy H back to the beginning of D
+	thrust::copy(H.begin(), H.end(), D.begin);
+		
 	return 0;
 }

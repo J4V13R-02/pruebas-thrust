@@ -1,6 +1,6 @@
-#include "thrust/device_ptr.h"
-#include "thrust/device_malloc.h"
-#include "thrust/fill.h"
+#include <thrust/device_ptr.h>
+#include <thrust/device_malloc.h>
+#include <thrust/fill.h>
 
 int main(void) {
 	size_t N = 10;

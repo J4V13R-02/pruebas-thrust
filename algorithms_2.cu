@@ -2,7 +2,6 @@
 #include <thrust/reduce.h>
 #include <thrust/functional.h>
 
-#include <iostream>
 
 int main(void) {
 	
